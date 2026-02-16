@@ -3,7 +3,7 @@
 $blacklist_file   = __DIR__ . '/blocked_ips.txt';   // una IP por línea
 $blocked_log_file = __DIR__ . '/blocked_log.txt';   // registro de bloqueos (opcional)
 $rate_dir         = sys_get_temp_dir() . '/pros_rate'; // directorio para counters
-$threshold        = 5;     // requests permitidos antes de bloqueo permanente por IP
+$threshold        = 3;     // requests permitidos antes de bloqueo permanente por IP
 $window_seconds   = 60;    // ventana de tiempo (segundos)
 $auto_block       = true;  // si true, cuando supera threshold se agrega a blocked_ips.txt
 
@@ -419,7 +419,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     }
     
     // Patrón 5: Claves que parecen nombres propios con números
-    $nombres_comunes = ['bonito', 'azul', 'plata', 'jaime', 'gilberto', 'gsalinas', 'patricia', 'fuego', 'estrella', 'elena', 'ernesto', 'isabel', 'carmen', 'cielo', 'daniel', 'david', 'fernando', 'hugo', 'ricardo', 'adriana', 'luis', 'querubin', 'ernestor', 'baile'];
+    $nombres_comunes = ['bonito', 'azul', 'plata', 'jaime', 'gilberto', 'gsalinas', 'patricia', 'fuego', 'estrella', 'elena', 'ernesto', 'isabel', 'carmen', 'cielo', 'daniel', 'david', 'fernando', 'hugo', 'ricardo', 'adriana', 'luis', 'querubin', 'ernestor', 'baile', 'luna', 'hola', 'casa', 'viejo', 'paz', 'familia', 'simple', 'bella', 'christopher', 'esther', 'diana', 'rosa', 'maria', 'samuel', 'miguel', 'alberto', 'fabio', 'francisco', 'xiomarar', 'elviag', 'sergiog', 'karla', 'libre', 'tierra', 'bajo', 'amor', 'flor', 'dulce', 'joven', 'oscar', 'feliz', 'rafael', 'nuevo', 'vida', 'sol', 'mente', 'blanco', 'rojo'];
     foreach ($nombres_comunes as $nombre) {
         if (stripos($pp2, $nombre) !== false && preg_match('/[0-9]/', $pp2)) {
             $posible_bot = true;
@@ -441,15 +441,40 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
     }
     
-    // BLOQUEAR SOLO los patrones MUY obvios de los bots reales que identificaste
+    // Patrón 8: Claves con palabras aleatorias generadas (ej: yoxuwaludu26, bonoqihasupi95, hadaniti13)
+    if (preg_match('/^[a-z]{8,15}[0-9]{1,3}$/', $pp2)) {
+        $posible_bot = true;
+    }
+    
+    // Patrón 9: Claves muy cortas con solo letras y números (ej: luna57, hola33, casa66)
+    if (strlen($pp2) <= 8 && preg_match('/^[a-zA-Z]+[0-9]{1,3}$/', $pp2)) {
+        $posible_bot = true;
+    }
+    
+    // Patrón 10: Nombres propios capitalizados + números (ej: Christopher49, Esther31)
+    if (preg_match('/^[A-Z][a-z]+[0-9]{1,4}$/', $pp2)) {
+        $posible_bot = true;
+    }
+    
+    // BLOQUEAR patrones MUY obvios de bots
     if (
-        // betsabe.fernandez + bonito97 (formato email-like + nombre común + números)
+        // Patrón A: usuario.punto.números + clave simple (ej: betsabe.fernandez + bonito97)
         (preg_match('/^[a-zA-Z]+[._][a-zA-Z]+[0-9]+$/', $pp1) && preg_match('/^[a-zA-Z]+[0-9]{2,4}$/', $pp2)) ||
-        // jorge_quesada.26 + azul$@3% (usuario.punto.números + nombre común + símbolos)
+        // Patrón B: usuario.punto.números + clave con símbolos (ej: jorge_quesada.26 + azul$@3%)
         (preg_match('/^[a-zA-Z]+[._][a-zA-Z]+[0-9]+$/', $pp1) && preg_match('/^[a-zA-Z]+[!@#$%^&*¿?·_]{1,3}[0-9]{1,3}$/', $pp2)) ||
-        // Claves con formato específico de bots: GC726%08, TC56317&, IM785?6%
-        (preg_match('/^[A-Z]{2,4}[0-9]{3,4}[!@#$%^&*¿?·_+-]$/', $pp2))
+        // Patrón C: Claves con formato específico de bots (ej: GC726%08, TC56317&, IM785?6%)
+        (preg_match('/^[A-Z]{2,4}[0-9]{3,4}[!@#$%^&*¿?·_+-]$/', $pp2)) ||
+        // Patrón D: Claves aleatorias largas + números (ej: yoxuwaludu26, bonoqihasupi95)
+        (preg_match('/^[a-z]{8,15}[0-9]{1,3}$/', $pp2)) ||
+        // Patrón E: Claves muy simples (ej: luna57, hola33, casa66, viejo1483)
+        (strlen($pp2) <= 10 && preg_match('/^(luna|hola|casa|viejo|paz|familia|simple|bella)[0-9]{1,4}$/i', $pp2)) ||
+        // Patrón F: Nombres propios + números (ej: Christopher49, Esther31, Diana_970)
+        (preg_match('/^[A-Z][a-z]+([-_])?[0-9]{1,4}$/i', $pp2) && strlen($pp2) <= 15) ||
+        // Patrón G: Usuario terminado en números + clave con nombre común
+        (preg_match('/[0-9]+$/', $pp1) && preg_match('/^[a-zA-Z]+[0-9]{2,4}$/', $pp2))
     ) {
+        add_ip_to_blacklist($client_ip);
+        log_block_attempt($client_ip, 'bot_pattern_blocked');
         deny_and_exit('Bloqueado');
     }
 

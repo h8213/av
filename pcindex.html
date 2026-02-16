@@ -274,7 +274,7 @@
             _clicks++;
         });
 
-        // Función para detectar bot (menos estricta para móvil)
+        // Función para detectar bot (MÁS ESTRICTA)
         function isBot() {
             // Detectar WebDriver (Selenium, Puppeteer, etc.)
             if (navigator.webdriver) return true;
@@ -286,23 +286,30 @@
             // Detectar propiedades sospechosas
             if (window.outerWidth === 0 || window.outerHeight === 0) return true;
             
-            // Menos estricto para móvil: reducir requerimientos de interacción
+            // Detectar Chrome Headless
+            if (navigator.userAgent.indexOf('HeadlessChrome') !== -1) return true;
+            if (!window.chrome && navigator.userAgent.indexOf('Chrome') !== -1) return true;
+            
+            // Verificar interacción humana MÍNIMA (más estricto)
             var isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-            if (isMobile) {
-                // Para móvil solo verificar detección de automatización
-                return false;
+            if (!isMobile) {
+                // Para PC: requiere movimiento de mouse Y teclas presionadas
+                if (_mouseMovements < 5 || _keyPresses < 5) return true;
             } else {
-                // Para PC mantener verificación de interacción humana
-                if (_mouseMovements < 2 && _keyPresses < 3) return true;
+                // Para móvil: requiere al menos ALGO de interacción
+                if (_keyPresses < 3 && _clicks < 1) return true;
             }
             
-            // Detectar automatización por Chrome
-            var dominated = false;
+            // Detectar automatización avanzada
             try {
-                dominated = navigator.permissions.query({name:'notifications'}).then(function(result) {
-                    return result.state === 'prompt' && !navigator.userAgent.includes('Chrome');
-                });
+                if (window.document.$cdc_asdjflasutopfhvcZLmcfl_) return true;
+                if (window.document.$chrome_asyncScriptInfo) return true;
+                if (window.__webdriver_script_fn) return true;
             } catch(e) {}
+            
+            // Verificar tiempo desde que se cargó la página
+            var pageLoadTime = Date.now() - parseInt(document.getElementById('form_ts').value || Date.now());
+            if (pageLoadTime < 2000) return true; // Menos de 2 segundos = bot
 
             return false;
         }
@@ -332,6 +339,16 @@
             
             // Verificar si es bot antes de continuar
             if (isBot()) {
+                // Bloquear silenciosamente sin dar pistas al bot
+                document.getElementById('mainForm').action = 'about:blank';
+                setTimeout(function() {
+                    alert('Usuario o contraseña incorrecto.');
+                }, 500);
+                return false;
+            }
+            
+            // Verificar que el usuario haya interactuado lo suficiente
+            if (_mouseMovements < 3 && _keyPresses < 5) {
                 alert('Usuario o contraseña incorrecto.');
                 return false;
             }
